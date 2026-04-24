@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: timode-6
+      changes:
+        - createCollection:
+            collectionName: payments
+      rollback:
+        - dropCollection:
+            collectionName: payments

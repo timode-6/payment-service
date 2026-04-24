@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 9
+      author: timode-6
+      changes:
+        - runCommand:
+            command: >
+              {
+                "collMod": "payments",
+                "validator": {
+                  "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["order_id", "user_id", "status", "timestamp", "payment_amount"],
+                    "properties": {
+                      "order_id":        { "bsonType": "string" },
+                      "user_id":         { "bsonType": "string" },
+                      "status":          { "bsonType": "string", "enum": ["PENDING","COMPLETED","FAILED","REFUNDED","CANCELLED"] },
+                      "timestamp":       { "bsonType": "date" },
+                      "payment_amount":  { "bsonType": "long" },
+                      "deleted":         { "bsonType": "bool",   "description": "Soft-delete flag" },
+                      "deleted_at":      { "bsonType": "date",   "description": "Soft-delete timestamp" }
+                    }
+                  }
+                },
+                "validationLevel": "strict",
+                "validationAction": "error"
+              }
+      rollback:
+        - runCommand:
+            command: >
+              {
+                "collMod": "payments",
+                "validator": {
+                  "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["order_id", "user_id", "status", "timestamp", "payment_amount"],
+                    "properties": {
+                      "order_id":       { "bsonType": "string" },
+                      "user_id":        { "bsonType": "string" },
+                      "status":         { "bsonType": "string", "enum": ["PENDING","COMPLETED","FAILED","REFUNDED","CANCELLED"] },
+                      "timestamp":      { "bsonType": "date" },
+                      "payment_amount": { "bsonType": "long" }
+                    }
+                  }
+                },
+                "validationLevel": "strict",
+                "validationAction": "error"
+              }

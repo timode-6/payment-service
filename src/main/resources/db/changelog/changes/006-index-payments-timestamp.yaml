@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 6
+      author: timode-6
+      changes:
+        - createIndex:
+            collectionName: payments
+            keys: '{ "timestamp": -1 }'
+            options: '{ "name": "idx_payments_timestamp" }'
+      rollback:
+        - dropIndex:
+            collectionName: payments
+            indexName: idx_payments_timestamp

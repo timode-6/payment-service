@@ -37,3 +37,4 @@ out/
 .vscode/
 HELP.md
 gradlew.bat
+.env

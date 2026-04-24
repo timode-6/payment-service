@@ -1,0 +1,50 @@
+databaseChangeLog:
+- changeSet:
+      id: 2
+      author: timode-6
+      changes:
+        - runCommand:
+            command: >
+              {
+                "collMod": "payments",
+                "validator": {
+                  "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["order_id", "user_id", "status", "timestamp", "payment_amount"],
+                    "properties": {
+                      "order_id": {
+                        "bsonType": "string",
+                        "description": "Reference to the order - required"
+                      },
+                      "user_id": {
+                        "bsonType": "string",
+                        "description": "Reference to the user - required"
+                      },
+                      "status": {
+                        "bsonType": "string",
+                        "enum": ["PENDING", "COMPLETED", "FAILED", "REFUNDED", "CANCELLED"],
+                        "description": "Payment status - required"
+                      },
+                      "timestamp": {
+                        "bsonType": "date",
+                        "description": "Payment creation timestamp - required"
+                      },
+                      "payment_amount": {
+                        "bsonType": "long",
+                        "description": "Payment amount in cents - required"
+                      }
+                    }
+                  }
+                },
+                "validationLevel": "strict",
+                "validationAction": "error"
+              }
+      rollback:
+        - runCommand:
+            command: >
+              {
+                "collMod": "payments",
+                "validator": {},
+                "validationLevel": "off",
+                "validationAction": "warn"
+              }

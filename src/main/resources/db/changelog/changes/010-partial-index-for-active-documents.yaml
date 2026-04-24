@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 10
+      author: timode-6
+      changes:
+        - runCommand:
+            command: >
+              {
+                "createIndexes": "payments",
+                "indexes": [{
+                  "key": { "deleted": 1, "timestamp": -1 },
+                  "name": "idx_payments_active_timestamp",
+                  "partialFilterExpression": { "deleted": { "$eq": false } }
+                }]
+              }
+      rollback:
+        - dropIndex:
+            collectionName: payments
+            indexName: idx_payments_active_timestamp

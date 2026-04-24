@@ -1,0 +1,13 @@
+databaseChangeLog:
+- changeSet:
+      id: 5
+      author: timode-6
+      changes:
+        - createIndex:
+            collectionName: payments
+            keys: '{ "status": 1 }'
+            options: '{ "name": "idx_payments_status" }'
+      rollback:
+        - dropIndex:
+            collectionName: payments
+            indexName: idx_payments_status
