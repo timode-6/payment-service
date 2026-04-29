@@ -3,16 +3,15 @@ package com.example.payment_service.security;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
 
 @Getter
-public class UserPrincipal implements UserDetails {
+public class UserPrincipal {
 
     private final String userId;
-    private final String role;   
+    private final String role;
 
     public UserPrincipal(String userId, String role) {
         this.userId = userId;
@@ -23,37 +22,11 @@ public class UserPrincipal implements UserDetails {
         return "ADMIN".equalsIgnoreCase(role);
     }
 
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
+    public Collection<GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
     }
 
-    @Override 
-    public String  getPassword(){
-        return null; 
-    }
-
-    @Override
-    public String  getUsername(){
-        return userId; 
-    }
-
-    @Override
-    public boolean isAccountNonExpired(){
-        return true;
-    }
-    
-    @Override 
-    public boolean isAccountNonLocked(){ 
-        return true; 
-    }
-    @Override
-    public boolean isCredentialsNonExpired(){
-        return true; 
-    }
-
-    @Override
-    public boolean isEnabled(){
-        return true; 
+    public static UserPrincipal of(String userId, String role) {
+        return new UserPrincipal(userId, role);
     }
 }

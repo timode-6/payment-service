@@ -1,6 +1,6 @@
 package com.example.payment_service.config;
 
-import com.example.payment_service.filter.JwtAuthFilter;
+import com.example.payment_service.filter.InternalAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,27 +14,28 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity          
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthFilter jwtAuthFilter;
-    
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String API_PAYMENTS = "/api/payments";
+    private final InternalAuthFilter internalAuthFilter;
+
+    private static final String ADMIN = "ADMIN";
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http){
+    public SecurityFilterChain filterChain(HttpSecurity http){
         return http
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm ->
+                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                    .requestMatchers(HttpMethod.GET,    API_PAYMENTS + "/summary/all").hasRole(ROLE_ADMIN)
-                    .requestMatchers(HttpMethod.DELETE, API_PAYMENTS + "/**").hasRole(ROLE_ADMIN)
-                    .requestMatchers(HttpMethod.PUT,    API_PAYMENTS + "/**").hasRole(ROLE_ADMIN)
-                    .requestMatchers(API_PAYMENTS + "/**").authenticated()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/payments/**").hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.PUT,    "/api/payments/**").hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.GET, "/api/payments/summary/all")
+                            .hasRole(ADMIN)
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }
