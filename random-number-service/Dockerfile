@@ -1,31 +1,28 @@
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod ./
+COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
     -ldflags="-s -w" \
     -trimpath \
     -o server .
 
-
 FROM alpine:3.21
 
-RUN apk --no-cache add ca-certificates wget
+RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=builder /app/server .
 
-USER nobody:nobody
+USER 65534:65534
 
 ENV PORT=8085
 EXPOSE 8085
-
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:${PORT}/health | grep -q UP || exit 1
 
 ENTRYPOINT ["/app/server"]

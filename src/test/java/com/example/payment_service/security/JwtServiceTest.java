@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
 
-    private static final String SECRET = "test-secret-key-that-is-long-enough-for-hmac";
+    private static final String SECRET = "U2VjcmV0S2V5Rm9ySldUVG9rZW5TaWduaW5nMTIzNDU2Nzg5MEF";
 
     private JwtService jwtService;
     private SecretKey signingKey;

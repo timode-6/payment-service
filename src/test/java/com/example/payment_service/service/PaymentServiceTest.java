@@ -42,35 +42,35 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
-    @Mock private PaymentRepository    paymentRepository;
-    @Mock private MongoTemplate        mongoTemplate;
-    @Mock private PaymentMapper        paymentMapper;
-    @Mock private RandomNumberClient   randomNumberClient;
+    @Mock private PaymentRepository paymentRepository;
+    @Mock private MongoTemplate mongoTemplate;
+    @Mock private PaymentMapper paymentMapper;
+    @Mock private RandomNumberClient randomNumberClient;
     @Mock private PaymentEventProducer eventProducer;
 
     @InjectMocks private PaymentServiceImpl service;
 
 
     private static final String ADMIN_ID = "admin-1";
-    private static final String USER_ID  = "user-1";
+    private static final String USER_ID = "user-1";
     private static final String ORDER_ID = "order-1";
-    private static final String PAY_ID   = "pay-1";
+    private static final String PAY_ID = "pay-1";
 
     private UserPrincipal adminPrincipal;
     private UserPrincipal userPrincipal;
-    private Payment       entity;
-    private PaymentDto    dto;
+    private Payment entity;
+    private PaymentDto dto;
 
     @BeforeEach
     void setUp() {
         adminPrincipal = new UserPrincipal(ADMIN_ID, "ADMIN");
-        userPrincipal  = new UserPrincipal(USER_ID,  "USER");
+        userPrincipal = new UserPrincipal(USER_ID,  "USER");
 
         entity = Payment.builder()
                 .id(PAY_ID)
                 .orderId(ORDER_ID)
                 .userId(USER_ID)
-                .status(PaymentStatus.COMPLETED)
+                .status(PaymentStatus.SUCCESS)
                 .paymentAmount(9999L)
                 .timestamp(Instant.now())
                 .build();
@@ -79,7 +79,7 @@ class PaymentServiceImplTest {
                 .id(PAY_ID)
                 .orderId(ORDER_ID)
                 .userId(USER_ID)
-                .status(PaymentStatus.COMPLETED)
+                .status(PaymentStatus.SUCCESS)
                 .paymentAmount(9999L)
                 .timestamp(entity.getTimestamp())
                 .build();
@@ -89,7 +89,7 @@ class PaymentServiceImplTest {
     @Test
     void evenNumber_completedStatus_eventPublished() {
         CreatePaymentRequest req = buildCreateRequest(USER_ID, 9999L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(false);
         when(paymentMapper.fromCreateRequest(req)).thenReturn(entity);
         when(randomNumberClient.isEven()).thenReturn(true);
         when(paymentRepository.save(entity)).thenReturn(entity);
@@ -98,7 +98,7 @@ class PaymentServiceImplTest {
         PaymentDto result = service.createPayment(req, userPrincipal);
 
         assertThat(result.getId()).isEqualTo(PAY_ID);
-        assertThat(entity.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(entity.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
 
         ArgumentCaptor<CreatePaymentEvent> eventCaptor =
                 ArgumentCaptor.forClass(CreatePaymentEvent.class);
@@ -109,7 +109,7 @@ class PaymentServiceImplTest {
         assertThat(publishedEvent.getPaymentId()).isEqualTo(PAY_ID);
         assertThat(publishedEvent.getOrderId()).isEqualTo(ORDER_ID);
         assertThat(publishedEvent.getUserId()).isEqualTo(USER_ID);
-        assertThat(publishedEvent.getPaymentStatus()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(publishedEvent.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(publishedEvent.getPaymentAmount()).isEqualByComparingTo(9999L);
     }
 
@@ -120,7 +120,7 @@ class PaymentServiceImplTest {
                 .paymentAmount(5000L).timestamp(Instant.now()).build();
 
         CreatePaymentRequest req = buildCreateRequest(USER_ID, 5000L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(false);
         when(paymentMapper.fromCreateRequest(req)).thenReturn(freshEntity);
         when(randomNumberClient.isEven()).thenReturn(false);
         when(paymentRepository.save(freshEntity)).thenReturn(freshEntity);
@@ -140,7 +140,7 @@ class PaymentServiceImplTest {
     @Test
     void userCreatesOwnPayment() {
         CreatePaymentRequest req = buildCreateRequest(USER_ID, 5000L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(false);
         when(paymentMapper.fromCreateRequest(req)).thenReturn(entity);
         when(randomNumberClient.isEven()).thenReturn(true);
         when(paymentRepository.save(any())).thenReturn(entity);
@@ -163,7 +163,7 @@ class PaymentServiceImplTest {
     @Test
     void adminCreatesForAnyUser() {
         CreatePaymentRequest req = buildCreateRequest("other-user", 5000L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(false);
         when(paymentMapper.fromCreateRequest(req)).thenReturn(entity);
         when(randomNumberClient.isEven()).thenReturn(true);
         when(paymentRepository.save(any())).thenReturn(entity);
@@ -176,7 +176,7 @@ class PaymentServiceImplTest {
     @Test
     void duplicateOrder_noEvent() {
         CreatePaymentRequest req = buildCreateRequest(USER_ID, 5000L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(true);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.createPayment(req, userPrincipal))
                 .isInstanceOf(DuplicatePaymentException.class);
@@ -192,7 +192,7 @@ class PaymentServiceImplTest {
                 .paymentAmount(1000L).timestamp(Instant.now()).build();
 
         CreatePaymentRequest req = buildCreateRequest(USER_ID, 1000L);
-        when(paymentRepository.existsByOrderId(ORDER_ID)).thenReturn(false);
+        when(paymentRepository.existsByOrderIdAndDeletedFalse(ORDER_ID)).thenReturn(false);
         when(paymentMapper.fromCreateRequest(req)).thenReturn(newEntity);
         when(randomNumberClient.isEven()).thenReturn(false);
         when(paymentRepository.save(newEntity)).thenReturn(newEntity);
@@ -269,7 +269,7 @@ void nonOwnerBlocked() {
     @Test
     void byForeignOrderId() {
         Payment foreign = Payment.builder().id("x").orderId(ORDER_ID)
-                .userId("someone-else").status(PaymentStatus.COMPLETED)
+                .userId("someone-else").status(PaymentStatus.SUCCESS)
                 .paymentAmount(1000L).timestamp(Instant.now()).build();
         when(paymentRepository.findByOrderId(ORDER_ID)).thenReturn(Optional.of(foreign));
 
@@ -278,13 +278,13 @@ void nonOwnerBlocked() {
 
     @Test
     void byStatusScopedUser() {
-        when(paymentRepository.findByUserIdAndStatus(USER_ID, PaymentStatus.COMPLETED))
+        when(paymentRepository.findByUserIdAndStatus(USER_ID, PaymentStatus.SUCCESS))
                 .thenReturn(List.of(entity));
         when(paymentMapper.toDtoList(List.of(entity))).thenReturn(List.of(dto));
 
-        assertThat(service.getPayments(null, null, PaymentStatus.COMPLETED, userPrincipal))
+        assertThat(service.getPayments(null, null, PaymentStatus.SUCCESS, userPrincipal))
                 .hasSize(1);
-        verify(paymentRepository).findByUserIdAndStatus(USER_ID, PaymentStatus.COMPLETED);
+        verify(paymentRepository).findByUserIdAndStatus(USER_ID, PaymentStatus.SUCCESS);
     }
 
     @Test
@@ -313,7 +313,7 @@ void nonOwnerBlocked() {
 
 
     private final Instant from = Instant.now().minus(7, ChronoUnit.DAYS);
-    private final Instant to   = Instant.now();
+    private final Instant to = Instant.now();
 
     @SuppressWarnings("unchecked")
     private void mockAggregation(Long total, long count) {

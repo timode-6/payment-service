@@ -22,7 +22,7 @@ databaseChangeLog:
                       },
                       "status": {
                         "bsonType": "string",
-                        "enum": ["PENDING", "COMPLETED", "FAILED", "REFUNDED", "CANCELLED"],
+                        "enum": ["PENDING", "SUCCESS", "FAILED", "REFUNDED", "CANCELLED"],
                         "description": "Payment status - required"
                       },
                       "timestamp": {

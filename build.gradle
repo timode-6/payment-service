@@ -81,6 +81,13 @@ dependencies {
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-kafka'
 
+	// testImplementation 'org.wiremock:wiremock:3.13.0'
+	testImplementation 'org.wiremock:wiremock-standalone:3.13.0'
+	testImplementation "org.testcontainers:mongodb:1.19.7"
+	testImplementation 'org.testcontainers:kafka:1.21.4'
+	testImplementation 'org.awaitility:awaitility:4.2.2'
+	// testImplementation 'org.wiremock:wiremock-jetty12:3.13.0'
+
 	testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
 	
 	testCompileOnly 'org.projectlombok:lombok'
@@ -91,5 +98,8 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+    finalizedBy jacocoTestReport
 }

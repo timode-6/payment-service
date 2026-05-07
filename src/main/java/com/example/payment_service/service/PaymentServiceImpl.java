@@ -3,11 +3,12 @@ package com.example.payment_service.service;
 import com.example.payment_service.client.RandomNumberClient;
 import com.example.payment_service.dto.requests.CreatePaymentRequest;
 import com.example.payment_service.dto.requests.PaymentDto;
-import com.example.payment_service.dto.responses.PaymentSummaryResponse;
 import com.example.payment_service.dto.requests.UpdatePaymentRequest;
+import com.example.payment_service.dto.responses.PaymentSummaryResponse;
 import com.example.payment_service.exception.DuplicatePaymentException;
 import com.example.payment_service.exception.PaymentNotFoundException;
 import com.example.payment_service.kafka.events.CreatePaymentEvent;
+import com.example.payment_service.kafka.events.OrderCreatedEvent;
 import com.example.payment_service.kafka.PaymentEventProducer;
 import com.example.payment_service.mapper.PaymentMapper;
 import com.example.payment_service.model.Payment;
@@ -17,11 +18,12 @@ import com.example.payment_service.security.UserPrincipal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
@@ -39,26 +41,59 @@ public class PaymentServiceImpl implements PaymentService {
     private final RandomNumberClient randomNumberClient;
     private final PaymentEventProducer eventProducer;
 
-    private static final String TOTAL_AMOUNT = "totalAmount";
-    private static final String PAYMENT_COUNT = "paymentCount";
+    @Override
+    public PaymentDto createPaymentFromOrderEvent(OrderCreatedEvent event) {
+        String orderId = event.getOrderId().toString();
+        String userId = event.getUserId().toString();
+
+        if (paymentRepository.existsByOrderIdAndDeletedFalse(orderId)) {
+            log.info("Payment already exists for orderId={} — skipping duplicate event eventId={}",
+                    orderId, event.getEventId());
+            return paymentRepository.findByOrderId(orderId)
+                    .map(paymentMapper::toDto)
+                    .orElseThrow(() -> new PaymentNotFoundException(orderId));
+        }
+
+        boolean isEven = randomNumberClient.isEven();
+        PaymentStatus status = isEven ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
+
+        Payment payment = Payment.builder()
+                .orderId(orderId)
+                .userId(userId)
+                .status(status)
+                .paymentAmount(event.getTotalAmount())
+                .build();
+
+        Payment saved = paymentRepository.save(payment);
+        log.info("Auto-created payment id={} status={} for orderId={} userId={} via Kafka event",
+                saved.getId(), saved.getStatus(), orderId, userId);
+
+        publishCreatePaymentEvent(saved);
+
+        return paymentMapper.toDto(saved);
+    }
 
     @Override
     public PaymentDto createPayment(CreatePaymentRequest request, UserPrincipal principal) {
-        if (!principal.isAdmin() && !principal.getUserId().equals(request.getUserId())) {
+        if (!principal.isAdmin() &&
+        !principal.getUserId().equals(request.getUserId())) {
             throw new AccessDeniedException("You can only create payments for your own account");
         }
-        if (paymentRepository.existsByOrderId(request.getOrderId())) {
-            throw new DuplicatePaymentException(request.getOrderId());
+        if (paymentRepository.existsByOrderIdAndDeletedFalse(request.getOrderId())) {
+             throw new DuplicatePaymentException(request.getOrderId());
         }
 
         Payment payment = paymentMapper.fromCreateRequest(request);
-        payment.setStatus(randomNumberClient.isEven() ? PaymentStatus.COMPLETED : PaymentStatus.FAILED);
+
+        boolean isEven = randomNumberClient.isEven();
+        payment.setStatus(isEven ? PaymentStatus.SUCCESS : PaymentStatus.FAILED);
 
         Payment saved = paymentRepository.save(payment);
         log.info("Created payment {} (status={}) for order {} by user {}",
                 saved.getId(), saved.getStatus(), saved.getOrderId(), saved.getUserId());
 
         publishCreatePaymentEvent(saved);
+
         return paymentMapper.toDto(saved);
     }
 
@@ -74,8 +109,12 @@ public class PaymentServiceImpl implements PaymentService {
             String userId, String orderId, PaymentStatus status, UserPrincipal principal) {
 
         long filled = countNonNull(userId, orderId, status);
-        if (filled == 0) throw new IllegalArgumentException("Provide exactly one of: userId, orderId, status");
-        if (filled > 1)  throw new IllegalArgumentException("Only one filter parameter is allowed at a time");
+        if (filled == 0)
+            throw new IllegalArgumentException(
+                    "Provide exactly one of: userId, orderId, status");
+        if (filled > 1)
+            throw new IllegalArgumentException(
+                    "Only one filter parameter is allowed at a time");
 
         if (userId != null) {
             if (!principal.isAdmin() && !principal.getUserId().equals(userId)) {
@@ -99,7 +138,8 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentSummaryResponse getSummaryForCurrentUser(Instant from, Instant to, UserPrincipal principal) {
+    public PaymentSummaryResponse getSummaryForCurrentUser(
+            Instant from, Instant to, UserPrincipal principal) {
         validateDateRange(from, to);
         return buildSummary(principal.getUserId(), from, to);
     }
@@ -111,10 +151,10 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentDto updatePayment(String id, UpdatePaymentRequest request, UserPrincipal principal) {
-        if (!principal.isAdmin()) {
+    public PaymentDto updatePayment(
+            String id, UpdatePaymentRequest request, UserPrincipal principal) {
+        if (!principal.isAdmin())
             throw new AccessDeniedException("Only admins can update payments");
-        }
         if (request.getStatus() == null && request.getPaymentAmount() == null) {
             throw new IllegalArgumentException(
                     "At least one of 'status' or 'paymentAmount' must be provided");
@@ -133,14 +173,13 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentDto deletePayment(String id) {
+    public void deletePayment(String id) {
         Payment payment = findOrThrow(id);
-        paymentMapper.applySoftDelete(payment);
-        Payment saved = paymentRepository.save(payment);
-        log.info("Soft-deleted payment {}", id);
-        return paymentMapper.toDto(saved);
+        payment.setDeleted(true);
+        payment.setDeletedAt(Instant.now());
+        paymentRepository.save(payment);
+        log.info("Deleted payment {}", id);
     }
-
 
     private void publishCreatePaymentEvent(Payment payment) {
         CreatePaymentEvent event = CreatePaymentEvent.builder()
@@ -167,50 +206,49 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void validateDateRange(Instant from, Instant to) {
-        if (from == null || to == null) {
-            throw new IllegalArgumentException("Both 'from' and 'to' dates are required");
-        }
-        if (from.isAfter(to)) {
-            throw new IllegalArgumentException("'from' must not be after 'to'");
-        }
+        if (from == null || to == null)
+            throw new IllegalArgumentException(
+                    "Both 'from' and 'to' dates are required");
+        if (from.isAfter(to))
+            throw new IllegalArgumentException(
+                    "'from' must not be after 'to'");
     }
 
     private PaymentSummaryResponse buildSummary(String userId, Instant from, Instant to) {
-        Criteria criteria = Criteria.where("deleted").ne(true)
-                .and("status").is(PaymentStatus.COMPLETED)
+        Criteria criteria = Criteria.where("status").is(PaymentStatus.SUCCESS)
                 .and("timestamp").gte(from).lte(to);
-        if (userId != null) {
+        if (userId != null)
             criteria = criteria.and("user_id").is(userId);
-        }
 
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(criteria),
                 Aggregation.group()
-                        .sum("payment_amount").as(TOTAL_AMOUNT)
-                        .count().as(PAYMENT_COUNT)
-        );
+                        .sum("payment_amount").as("totalAmount")
+                        .count().as("paymentCount"));
 
-        Map<?, ?> result = mongoTemplate
-                .aggregate(aggregation, "payments", Map.class)
-                .getUniqueMappedResult();
+        AggregationResults<Map> results = mongoTemplate.aggregate(aggregation, "payments", Map.class);
+        Map<?, ?> result = results.getUniqueMappedResult();
 
-        Long total = result != null && result.get(TOTAL_AMOUNT) != null
-                ? Long.parseLong(result.get(TOTAL_AMOUNT).toString()) : 0L;
-        Long count = result != null && result.get(PAYMENT_COUNT) != null
-                ? Long.parseLong(result.get(PAYMENT_COUNT).toString()) : 0L;
+        Long total = 0L;
+        long count = 0L;
+        if (result != null) {
+            Object rawTotal = result.get("totalAmount");
+            Object rawCount = result.get("paymentCount");
+            total = rawTotal != null ? Long.parseLong(rawTotal.toString()) : 0L;
+            count = rawCount != null ? Long.parseLong(rawCount.toString()) : 0L;
+        }
 
         return PaymentSummaryResponse.builder()
-                .totalAmount(total)
-                .paymentCount(count)
-                .from(from)
-                .to(to)
-                .userId(userId)
-                .build();
+                .totalAmount(total).paymentCount(count)
+                .from(from).to(to).userId(userId).build();
     }
 
     private long countNonNull(Object... values) {
         long count = 0;
-        for (Object v : values) { if (v != null) count++; }
+        for (Object v : values) {
+            if (v != null)
+                count++;
+        }
         return count;
     }
 }

@@ -10,15 +10,27 @@ databaseChangeLog:
                 "validator": {
                   "$jsonSchema": {
                     "bsonType": "object",
-                    "required": ["order_id", "user_id", "status", "timestamp", "payment_amount"],
+                    "required": ["order_id", "user_id", "status", "timestamp", "payment_amount", "deleted"],
                     "properties": {
-                      "order_id":        { "bsonType": "string" },
-                      "user_id":         { "bsonType": "string" },
-                      "status":          { "bsonType": "string", "enum": ["PENDING","COMPLETED","FAILED","REFUNDED","CANCELLED"] },
-                      "timestamp":       { "bsonType": "date" },
-                      "payment_amount":  { "bsonType": "long" },
-                      "deleted":         { "bsonType": "bool",   "description": "Soft-delete flag" },
-                      "deleted_at":      { "bsonType": "date",   "description": "Soft-delete timestamp" }
+                      "order_id": { 
+                        "bsonType": "string", 
+                        "maxLength": 64 
+                      },
+                      "user_id": { 
+                        "bsonType": "string",
+                        "maxLength": 64 
+                      },
+                      "status": { 
+                        "bsonType": "string", 
+                        "enum": ["PENDING","SUCCESS","FAILED","REFUNDED","CANCELLED"] 
+                      },
+                      "timestamp": { "bsonType": "date" },
+                      "payment_amount": { 
+                        "bsonType": "long",
+                        "minimum": 1 
+                      },
+                      "deleted": { "bsonType": "bool", "description": "Soft-delete flag" },
+                      "deleted_at": { "bsonType": "date", "description": "Soft-delete timestamp" }
                     }
                   }
                 },
@@ -37,7 +49,7 @@ databaseChangeLog:
                     "properties": {
                       "order_id":       { "bsonType": "string" },
                       "user_id":        { "bsonType": "string" },
-                      "status":         { "bsonType": "string", "enum": ["PENDING","COMPLETED","FAILED","REFUNDED","CANCELLED"] },
+                      "status":         { "bsonType": "string", "enum": ["PENDING","SUCCESS","FAILED","REFUNDED","CANCELLED"] },
                       "timestamp":      { "bsonType": "date" },
                       "payment_amount": { "bsonType": "long" }
                     }

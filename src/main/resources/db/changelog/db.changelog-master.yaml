@@ -15,3 +15,7 @@ databaseChangeLog:
       file: db/changelog/changes/007-index-payments-user-status.yaml
   - include:
       file: db/changelog/changes/008-index-payments-user-timestamp.yaml
+  - include:
+      file: db/changelog/changes/009-add-fields-to-validator.yaml
+  - include:
+      file: db/changelog/changes/010-partial-index-for-active-documents.yaml

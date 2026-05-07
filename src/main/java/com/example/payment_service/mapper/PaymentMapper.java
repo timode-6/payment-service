@@ -34,6 +34,7 @@ public interface PaymentMapper {
     @Mapping(target = "status",    ignore = true)
     @Mapping(target = "timestamp", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted",   constant = "false")
     Payment fromCreateRequest(CreatePaymentRequest request);
 
 

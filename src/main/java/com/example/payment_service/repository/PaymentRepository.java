@@ -15,8 +15,7 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
     @Query("{ '_id': ?0, 'deleted': false }")
     Optional<Payment> findById(String id);
 
-    @Query("{ 'order_id': ?0, 'deleted': false }")
-    boolean existsByOrderId(String orderId);
+    boolean existsByOrderIdAndDeletedFalse(String orderId);
 
     @Query("{ 'user_id': ?0, 'deleted': false }")
     List<Payment> findByUserId(String userId);
