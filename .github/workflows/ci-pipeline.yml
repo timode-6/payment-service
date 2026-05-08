@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - tasks
+      - tasks*
   pull_request:
     branches:
       - main
-      - tasks
+      - tasks*
 
 env:
   JAVA_VERSION: '21'
